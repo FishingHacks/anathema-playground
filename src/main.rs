@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use anathema::{
@@ -11,7 +11,9 @@ use anathema::{
     templates::blueprints::Blueprint,
     widgets::{components::events::KeyState, Element},
 };
-use temp_file::TempFile;
+use thread_backend::{launch_threaded_anathema, AnathemaThreadHandle};
+
+mod thread_backend;
 
 #[derive(State)]
 struct EditorState {
@@ -34,18 +36,21 @@ struct Editor {
     offset_y: usize,
     cursor_x: usize,
     cursor_y: usize,
-    file: File,
+    file: Option<PathBuf>,
     // while this is >0, tick() repaints the canvas
     should_rerender: u8,
 }
 
 impl Editor {
-    pub fn new(file: File) -> Self {
-        let lines = std::fs::read_to_string(file.path())
-            .expect("failed to read the specified path")
-            .lines()
-            .map(str::to_string)
-            .collect();
+    pub fn new(file: Option<PathBuf>) -> Self {
+        let lines = match &file {
+            Some(file) => std::fs::read_to_string(file)
+                .expect("failed to read the specified path")
+                .lines()
+                .map(str::to_string)
+                .collect::<Vec<String>>(),
+            None => vec!["vstack".into(), "".into()],
+        };
 
         Self {
             file,
@@ -89,6 +94,10 @@ impl Editor {
     }
 
     fn run_code(&mut self, mut context: Context<'_, EditorState>) {
+        if let Some(handle) = THREAD_HANDLE.take() {
+            handle.close();
+        }
+
         let mut string = String::with_capacity(self.lines.len() * 20);
         if self.lines.len() == 0 || (self.lines.len() == 1 && self.lines[0].len() == 0) {
             string.push_str("text \"nothing to see here\"");
@@ -112,14 +121,22 @@ impl Editor {
                     context.publish("error", |state| &state.focused);
                     return;
                 }
-                match std::fs::write(self.file.path(), string.as_bytes()) {
+                if let Some(file) = self.file.as_ref() {
+                    if let Err(e) = std::fs::write(file, string.as_bytes()) {
+                        ERROR.replace(format!("Failed to write the template: {e:?}"));
+                        context.publish("error", |state| &state.focused);
+                        return;
+                    }
+                }
+                match launch_threaded_anathema(string, context.viewport.size()) {
                     Err(e) => {
                         ERROR.replace(format!("Failed to write the template: {e:?}"));
                         context.publish("error", |state| &state.focused);
                         return;
                     }
-                    Ok(..) => {
+                    Ok(handle) => {
                         context.publish("run", |state| &state.focused);
+                        THREAD_HANDLE.set(Some(handle));
                     }
                 }
             }
@@ -175,6 +192,7 @@ fn validate_blueprint<'a>(blueprint: &'a Blueprint) -> Result<(), String> {
 }
 
 thread_local!(static ERROR: RefCell<String> = Default::default());
+thread_local!(static THREAD_HANDLE: RefCell<Option<AnathemaThreadHandle>> = Default::default());
 
 impl Component for Editor {
     // if true: run code
@@ -532,6 +550,7 @@ impl Component for Editor {
             return;
         }
         self.should_rerender -= 1;
+
         elements
             .by_tag("canvas")
             .first(|el, _| self.draw_canvas(el, *state.focused.to_ref()));
@@ -606,37 +625,105 @@ impl Component for Playground {
                 state: KeyState::Press
             }
         ) {
-            *state.showing.to_mut() = Showing::Editor;
+            if let Some(handle) = THREAD_HANDLE.take() {
+                handle.close();
+            }
             ctx.emitter
                 .emit(self.0, false)
                 .expect("failed to notify the editor to redraw the canvas");
+            *state.showing.to_mut() = Showing::Editor;
         }
     }
 }
 
-enum File {
-    Temp(TempFile),
-    Permanent(PathBuf),
+struct PreviewComponent;
+
+#[derive(State)]
+struct PreviewState {
+    width: Value<usize>,
+    height: Value<usize>,
 }
 
-impl File {
-    pub fn path(&self) -> &Path {
-        match self {
-            Self::Temp(f) => f.path(),
-            Self::Permanent(f) => f.as_path(),
-        }
+impl Component for PreviewComponent {
+    type State = PreviewState;
+    type Message = ();
+
+    fn tick(
+        &mut self,
+        _: &mut Self::State,
+        mut elements: Elements<'_, '_>,
+        _: Context<'_, Self::State>,
+        _: std::time::Duration,
+    ) {
+        let maybe_buffer = THREAD_HANDLE.with_borrow_mut(|maybe_handle| {
+            if let Some(handle) = maybe_handle {
+                match handle.get_buffer() {
+                    Err(_) => {
+                        maybe_handle.take().map(AnathemaThreadHandle::close);
+                        None
+                    }
+                    Ok(v) => v,
+                }
+            } else {
+                None
+            }
+        });
+        let Some(buffer) = maybe_buffer else {
+            return;
+        };
+
+        elements.by_tag("canvas").first(|element, _| {
+            let canvas_size = element.size();
+            let buffer_size = buffer.size();
+            let Some(canvas) = element.try_to::<Canvas>() else {
+                return;
+            };
+
+            for y in 0..canvas_size.height {
+                for x in 0..canvas_size.width {
+                    if x < buffer_size.width && y < buffer_size.height {
+                        if let Some((char, style)) = buffer.get((x as u16, y as u16).into()) {
+                            canvas.put(*char, *style, (x as u16, y as u16));
+                            continue;
+                        }
+                    }
+                    canvas.erase((x as u16, y as u16));
+                }
+            }
+        });
+    }
+
+    fn resize(
+        &mut self,
+        state: &mut Self::State,
+        _: Elements<'_, '_>,
+        context: Context<'_, Self::State>,
+    ) {
+        let size = context.viewport.size();
+        *state.width.to_mut() = size.width;
+        *state.height.to_mut() = size.height;
+
+        THREAD_HANDLE.with_borrow_mut(|maybe_handle| {
+            if let Some(handle) = maybe_handle {
+                if let Err(_) = handle.resize(size.width as u16, size.height as u16) {
+                    maybe_handle.take().map(AnathemaThreadHandle::close);
+                }
+            }
+        });
     }
 }
 
 macro_rules! release_bundle {
-    ($path: expr) => {
+    ($path: expr) => {{
+        #[cfg(debug_assertions)]
         {
-            #[cfg(debug_assertions)]
-            { ($path as &'static str).to_path() }
-            #[cfg(not(debug_assertions))]
-            { include_str!(concat!("../", $path)).to_template() }
+            ($path as &'static str).to_path()
         }
-    };
+        #[cfg(not(debug_assertions))]
+        {
+            include_str!(concat!("../", $path)).to_template()
+        }
+    }};
 }
 
 fn main() {
@@ -645,11 +732,8 @@ fn main() {
     if let Ok(path) = current_executable.strip_prefix(std::env::current_dir().unwrap_or_default()) {
         current_executable = path.to_path_buf();
     }
-    
-    let file = match std::env::args()
-        .skip(1)
-        .next()
-    {
+
+    let file = match std::env::args().skip(1).next() {
         Some(v) if v == "-h" || v == "--help" => {
             println!("Usage: {} [options] [path]\n", current_executable.display());
             println!("  -h --help: Display help information\n");
@@ -670,15 +754,9 @@ fn main() {
                 }
                 std::fs::write(&path, "vstack\n").expect("failed to open the specified path");
             }
-            File::Permanent(path)
+            Some(path)
         }
-        _ => {
-            let tempfile =
-                TempFile::with_suffix(".aml").expect("failed to create a temporary file");
-            std::fs::write(tempfile.path(), "vstack\n")
-                .expect("failed to write to the temporary file");
-            File::Temp(tempfile)
-        }
+        _ => None,
     };
 
     let backend = TuiBackend::builder()
@@ -688,23 +766,32 @@ fn main() {
         .finish()
         .expect("failed to build the backend");
 
-    let mut size = backend.size();
-    size.width -= 2;
-    size.height -= 2;
+    let mut editor_size = backend.size();
+    editor_size.width -= 2;
+    editor_size.height -= 2;
+    let size = backend.size();
 
     let mut runtime = Runtime::builder(Document::new("@main"), backend);
     runtime
-        .register_default::<()>("tempfile", SourceKind::Path(file.path().to_path_buf()))
-        .unwrap();
-    runtime
         .register_default::<()>("error", release_bundle!("templates/error.aml"))
         .unwrap();
+    runtime
+        .register_component(
+            "preview",
+            "canvas [width: width || 1, height: height || 1]".to_template(),
+            PreviewComponent,
+            PreviewState {
+                width: size.width.into(),
+                height: size.height.into(),
+            },
+        )
+        .expect("failed to create the preview component");
     let editor = runtime
         .register_component(
             "editor",
             release_bundle!("templates/editor.aml"),
             Editor::new(file),
-            size.into(),
+            editor_size.into(),
         )
         .unwrap();
     runtime

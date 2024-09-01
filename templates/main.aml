@@ -4,7 +4,7 @@ else if showing == "Error"
     @error { errors: showing.errors }
 else
     zstack
-        @tempfile
+        @preview
         hstack
             spacer
             text  [bold: true] "Press Ctrl+E to get back to the editor  "
