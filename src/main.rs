@@ -682,9 +682,9 @@ fn main() {
     };
 
     let backend = TuiBackend::builder()
-        .enable_alt_screen()
+        //.enable_alt_screen()
         .enable_raw_mode()
-        .hide_cursor()
+        //.hide_cursor()
         .finish()
         .expect("failed to build the backend");
 
@@ -718,5 +718,7 @@ fn main() {
         )
         .unwrap();
 
-    runtime.finish().expect("failed to build the runtime").run();
+    let mut rt = runtime.finish().expect("failed to build the runtime");
+    rt.fps = 60;
+    rt.run();
 }
