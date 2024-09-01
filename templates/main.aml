@@ -1,10 +1,26 @@
+let THEME = {
+    fg_file_focused: "cyan",
+    bold_file_focused: true,
+    fg_file_unfocused: "dark_grey",
+    bold_file_unfocused: false,
+    fg_keybind: "yellow",
+    bold_keybind: true,
+}
+
 if showing == "Editor"
     @editor (run->run_aml, error->editor_error)
 else if showing == "Error"
     @error { errors: showing.errors }
 else
     zstack
-        @preview
+        canvas [width: width || 1, height: height || 1, id: "preview"]
         hstack
             spacer
-            text  [bold: true] "Press Ctrl+E to get back to the editor  "
+            if focused
+                text "Press "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl+E"
+                    span " to get back to the editor  "
+            else
+                text "Press "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Tab"
+                    span " to focus  "

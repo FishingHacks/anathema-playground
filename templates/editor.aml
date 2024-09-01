@@ -4,13 +4,31 @@ zstack
     padding [left: 3, right: 3]
         hstack
             text "{ "
-                span [bold: true] "template.aml"
+                if focused
+                    span [bold: THEME.bold_file_focused, foreground: THEME.fg_file_focused] "template.aml"
+                else
+                    span [bold: THEME.bold_file_unfocused, foreground: THEME.fg_file_unfocused] "template.aml"
                 span " }"
             spacer
-            text "{ "
-                span [bold: true] "Tab: Focus/Unfocus"
-                span " | "
-                span [bold: true] "Ctrl-R: Run"
-                span " | "
-                span [bold: true] "Ctrl-Space: Tab"
-                span " }"
+            if focused
+                text "{ "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-R"
+                    span ": Run"
+                    span " | "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-Q"
+                    span ": Search"
+                    span " | "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-S"
+                    span ": Save"
+                    span " | "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-C"
+                    span ": Quit (does not save)"
+                    span " | "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-Space"
+                    span ": Tab"
+                    span " }"
+            else
+                text "{ "
+                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Tab"
+                    span ": Focus"
+                    span " }"
