@@ -1,7 +1,7 @@
 use std::{cell::RefCell, path::PathBuf};
 
 use anathema::{
-    backend::tui::Style,
+    backend::tui::{Color, Style},
     component::{Component, KeyCode, KeyEvent},
     default_widgets::Canvas,
     prelude::{Context, Document},
@@ -73,7 +73,22 @@ impl Editor {
                 .unwrap_or_default()
                 .chars();
 
-            for x in 0..size.width {
+            let line_num = (self.offset_y + y + 1).to_string();
+            let line_num = format!("{}{} ", " ".repeat(4 - line_num.len()), line_num);
+
+            let mut line_num_style = Style::new();
+            line_num_style.set_fg((88, 88, 88).into());
+
+            for x in 1..5 {
+                canvas.put(
+                    line_num.chars().nth(x).unwrap(),
+                    line_num_style,
+                    (x as u16, y as u16),
+                );
+            }
+
+            // probably safe to assume we wont have to show line numbers with more than 3 digits
+            for x in 5..size.width {
                 match line.next() {
                     Some(c) => canvas.put(c, Style::new(), (x as u16, y as u16)),
                     None => canvas.erase((x as u16, y as u16)),
@@ -82,7 +97,7 @@ impl Editor {
         }
 
         if draw_cursor {
-            let cursor_pos = (self.cursor_x as u16, self.cursor_y as u16);
+            let cursor_pos = (self.cursor_x as u16 + 5, self.cursor_y as u16);
             let char = canvas.get(cursor_pos).map(|v| v.0).unwrap_or(' ');
             let mut style = Style::new();
             style.set_inverse(true);
@@ -96,7 +111,7 @@ impl Editor {
         }
 
         let mut string = String::with_capacity(self.lines.len() * 20);
-        if self.lines.len() == 0 || (self.lines.len() == 1 && self.lines[0].len() == 0) {
+        if self.lines.is_empty() || (self.lines.len() == 1 && self.lines[0].is_empty()) {
             string.push_str("text \"nothing to see here\"");
         } else {
             for line in self.lines.iter() {
@@ -110,7 +125,6 @@ impl Editor {
             Err(e) => {
                 ERROR.replace(format!("Failed to compile the template: {e:?}"));
                 context.publish("error", |state| &state.focused);
-                return;
             }
             Ok((blueprint, _)) => {
                 if let Err(e) = validate_blueprint(&blueprint) {
@@ -129,7 +143,6 @@ impl Editor {
                     Err(e) => {
                         ERROR.replace(format!("Failed to write the template: {e:?}"));
                         context.publish("error", |state| &state.focused);
-                        return;
                     }
                     Ok(handle) => {
                         context.publish("run", |state| &state.focused);
