@@ -1,0 +1,16 @@
+zstack
+    border
+        canvas [width: width || 1, height: height || 1]
+    padding [left: 3, right: 3]
+        hstack
+            text "{ "
+                span [bold: true] "template.aml"
+                span " }"
+            spacer
+            text "{ "
+                span [bold: true] "Tab: Focus/Unfocus"
+                span " | "
+                span [bold: true] "Ctrl-R: Run"
+                span " | "
+                span [bold: true] "Ctrl-Space: Tab"
+                span " }"
