@@ -5,7 +5,7 @@ version = 3
 [[package]]
 name = "anathema"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-backend",
  "anathema-debug",
@@ -22,7 +22,7 @@ dependencies = [
 [[package]]
 name = "anathema-backend"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-geometry",
  "anathema-state",
@@ -37,12 +37,12 @@ dependencies = [
 [[package]]
 name = "anathema-debug"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 
 [[package]]
 name = "anathema-default-widgets"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-backend",
  "anathema-geometry",
@@ -57,7 +57,7 @@ dependencies = [
 [[package]]
 name = "anathema-geometry"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 
 [[package]]
 name = "anathema-playground"
@@ -70,7 +70,7 @@ dependencies = [
 [[package]]
 name = "anathema-runtime"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-backend",
  "anathema-debug",
@@ -87,7 +87,7 @@ dependencies = [
 [[package]]
 name = "anathema-state"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-debug",
  "anathema-state-derive",
@@ -97,7 +97,7 @@ dependencies = [
 [[package]]
 name = "anathema-state-derive"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "manyhow",
  "quote",
@@ -108,7 +108,7 @@ dependencies = [
 [[package]]
 name = "anathema-store"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-debug",
 ]
@@ -116,7 +116,7 @@ dependencies = [
 [[package]]
 name = "anathema-templates"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-debug",
  "anathema-state",
@@ -126,7 +126,7 @@ dependencies = [
 [[package]]
 name = "anathema-widgets"
 version = "0.3.0"
-source = "git+https://github.com/togglebyte/anathema?branch=dev#ffaef959491a4f53d60958be7cc46f1408335a07"
+source = "git+https://github.com/togglebyte/anathema#80911a3a5a70b1eda3f94fbfccfd3912571b137a"
 dependencies = [
  "anathema-debug",
  "anathema-geometry",

@@ -628,22 +628,32 @@ impl File {
     }
 }
 
+macro_rules! release_bundle {
+    ($path: expr) => {
+        {
+            #[cfg(debug_assertions)]
+            { ($path as &'static str).to_path() }
+            #[cfg(not(debug_assertions))]
+            { include_str!(concat!("../", $path)).to_template() }
+        }
+    };
+}
+
 fn main() {
     let mut current_executable =
         std::env::current_exe().expect("Failed to get path to the current executable");
     if let Ok(path) = current_executable.strip_prefix(std::env::current_dir().unwrap_or_default()) {
         current_executable = path.to_path_buf();
     }
-
+    
     let file = match std::env::args()
-        .filter(|arg| !current_executable.ends_with(arg))
+        .skip(1)
         .next()
     {
         Some(v) if v == "-h" || v == "--help" => {
             println!("Usage: {} [options] [path]\n", current_executable.display());
             println!("  -h --help: Display help information\n");
             println!("  uses a temporary file if no path was specified");
-
             return;
         }
         Some(path) => {
@@ -687,12 +697,12 @@ fn main() {
         .register_default::<()>("tempfile", SourceKind::Path(file.path().to_path_buf()))
         .unwrap();
     runtime
-        .register_default::<()>("error", "templates/error.aml")
+        .register_default::<()>("error", release_bundle!("templates/error.aml"))
         .unwrap();
     let editor = runtime
         .register_component(
             "editor",
-            "templates/editor.aml",
+            release_bundle!("templates/editor.aml"),
             Editor::new(file),
             size.into(),
         )
@@ -700,7 +710,7 @@ fn main() {
     runtime
         .register_component(
             "main",
-            "templates/main.aml",
+            release_bundle!("templates/main.aml"),
             Playground(editor),
             PlaygroundState {
                 showing: Showing::Editor.into(),
