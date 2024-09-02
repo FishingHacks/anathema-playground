@@ -502,10 +502,12 @@ impl TextBuffer {
                 HighlightState::String if str_is_escape => str_is_escape = false,
                 HighlightState::String if char == '\\' => str_is_escape = true,
                 HighlightState::String if char == str_starting_quote => {
-                    line[started_at..current]
+                    line[started_at..=current]
                         .iter_mut()
                         .for_each(|v| v.1 = HighlightingStyle::String);
                     highlight_state = HighlightState::None;
+                    current += 1;
+                    continue;
                 }
                 HighlightState::String => (),
             }
