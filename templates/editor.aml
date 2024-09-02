@@ -5,9 +5,9 @@ zstack
         hstack
             text "{ "
                 if focused
-                    span [bold: THEME.bold_file_focused, foreground: THEME.fg_file_focused] "template.aml"
+                    span [bold: THEME.bold_file_focused, foreground: THEME.fg_file_focused] file
                 else
-                    span [bold: THEME.bold_file_unfocused, foreground: THEME.fg_file_unfocused] "template.aml"
+                    span [bold: THEME.bold_file_unfocused, foreground: THEME.fg_file_unfocused] file
                 span " }"
             spacer
             if focused

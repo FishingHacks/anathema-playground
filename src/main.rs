@@ -4,13 +4,14 @@ use anathema::{
     backend::Backend, component::*, default_widgets::Canvas, prelude::*,
     widgets::components::events::KeyState,
 };
-use editor::{Editor, ERROR, THREAD_HANDLE};
+use editor::{Editor, EditorState, ERROR, THREAD_HANDLE};
 use thread_backend::AnathemaThreadHandle;
 
 mod editor;
+mod text_buffer;
 mod thread_backend;
 
-struct Playground(ComponentId<bool>);
+struct Playground;
 
 #[derive(State)]
 enum Showing {
@@ -54,7 +55,7 @@ impl Component for Playground {
         key: KeyEvent,
         state: &mut Self::State,
         _: Elements<'_, '_>,
-        ctx: Context<'_, Self::State>,
+        _: Context<'_, Self::State>,
     ) {
         if matches!(
             key,
@@ -67,9 +68,6 @@ impl Component for Playground {
             if let Some(handle) = THREAD_HANDLE.take() {
                 handle.close();
             }
-            ctx.emitter
-                .emit(self.0, false)
-                .expect("failed to notify the editor to redraw the canvas");
             *state.showing.to_mut() = Showing::Editor;
         }
     }
@@ -228,19 +226,22 @@ fn main() {
     runtime
         .register_default::<()>("error", release_bundle!("templates/error.aml"))
         .unwrap();
-    let editor = runtime
+
+    let editor_state = EditorState::new(editor_size, file.as_ref().map(PathBuf::as_path));
+    runtime
         .register_component(
             "editor",
             release_bundle!("templates/editor.aml"),
-            Editor::new(file),
-            editor_size.into(),
+            Editor::new(file, editor_size),
+            editor_state,
         )
         .unwrap();
+
     runtime
         .register_component(
             "main",
             release_bundle!("templates/main.aml"),
-            Playground(editor),
+            Playground,
             PlaygroundState {
                 showing: Showing::Editor.into(),
                 focused: true.into(),
