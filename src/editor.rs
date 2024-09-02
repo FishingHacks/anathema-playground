@@ -120,6 +120,9 @@ pub static VALID_WIDGETS: &[&str] = &[
     "overflow",
     "canvas",
     "container",
+    "padding",
+    "row",
+    "column",
 ];
 
 fn validate_blueprint<'a>(blueprint: &'a Blueprint) -> Result<(), String> {
