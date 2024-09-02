@@ -11,7 +11,7 @@ mod editor;
 mod text_buffer;
 mod thread_backend;
 
-struct Playground;
+struct Playground(ComponentId<()>);
 
 #[derive(State)]
 enum Showing {
@@ -55,7 +55,7 @@ impl Component for Playground {
         key: KeyEvent,
         state: &mut Self::State,
         _: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
+        ctx: Context<'_, Self::State>,
     ) {
         if matches!(
             key,
@@ -69,6 +69,7 @@ impl Component for Playground {
                 handle.close();
             }
             *state.showing.to_mut() = Showing::Editor;
+            _ = ctx.emit(self.0, ());
         }
     }
 
@@ -228,7 +229,7 @@ fn main() {
         .unwrap();
 
     let editor_state = EditorState::new(editor_size, file.as_ref().map(PathBuf::as_path));
-    runtime
+    let editor = runtime
         .register_component(
             "editor",
             release_bundle!("templates/editor.aml"),
@@ -241,7 +242,7 @@ fn main() {
         .register_component(
             "main",
             release_bundle!("templates/main.aml"),
-            Playground,
+            Playground(editor),
             PlaygroundState {
                 showing: Showing::Editor.into(),
                 focused: true.into(),

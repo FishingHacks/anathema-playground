@@ -363,7 +363,7 @@ impl TextBuffer {
         });
     }
 
-    pub fn draw_to_canvas(&self, canvas: &mut Canvas, draw_cursor: bool, size: Size) {
+    fn draw_to_canvas(&self, canvas: &mut Canvas, draw_cursor: bool, size: Size) {
         for y in 0..size.height {
             let mut line = self
                 .lines

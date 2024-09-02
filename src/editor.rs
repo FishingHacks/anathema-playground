@@ -160,11 +160,21 @@ impl Component for Editor {
     type Message = ();
     type State = EditorState;
 
+    fn message(
+        &mut self,
+        _: Self::Message,
+        _: &mut Self::State,
+        _: Elements<'_, '_>,
+        _: Context<'_, Self::State>,
+    ) {
+        self.should_rerender = 3;
+    }
+
     fn on_key(
         &mut self,
         key: KeyEvent,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
+        elements: Elements<'_, '_>,
         context: Context<'_, Self::State>,
     ) {
         if !*state.focused.to_ref() || matches!(key.state, KeyState::Release) {
@@ -207,6 +217,8 @@ impl Component for Editor {
 
             _ => return,
         }
+
+        self.buffer.draw(elements, *state.focused.to_ref());
     }
 
     fn resize(
@@ -219,15 +231,17 @@ impl Component for Editor {
         *state.height.to_mut() = size.height - 2;
         *state.width.to_mut() = size.width - 2;
         self.buffer.resize(size.width, size.height);
+        self.should_rerender = 3;
     }
 
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
+        elements: Elements<'_, '_>,
         _: Context<'_, Self::State>,
     ) {
         *state.focused.to_mut() = true;
+        self.buffer.draw(elements, *state.focused.to_ref());
     }
 
     fn on_blur(
@@ -246,7 +260,10 @@ impl Component for Editor {
         _: Context<'_, Self::State>,
         _: std::time::Duration,
     ) {
-        self.buffer.draw(elements, *state.focused.to_ref());
+        if self.should_rerender > 0 {
+            self.buffer.draw(elements, *state.focused.to_ref());
+            self.should_rerender -= 1;
+        }
     }
 
     fn accept_focus(&self) -> bool {
