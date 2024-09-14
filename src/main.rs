@@ -5,9 +5,11 @@ use anathema::{
     widgets::components::events::KeyState,
 };
 use editor::{Editor, EditorState, ERROR, THREAD_HANDLE};
+use input::{Input, InputState};
 use thread_backend::AnathemaThreadHandle;
 
 mod editor;
+mod input;
 mod text_buffer;
 mod thread_backend;
 
@@ -79,7 +81,7 @@ impl Component for Playground {
         _: Elements<'_, '_>,
         _: Context<'_, Self::State>,
     ) {
-        *state.focused.to_mut() = true;
+        state.focused.set(true);
     }
 
     fn on_blur(
@@ -88,11 +90,7 @@ impl Component for Playground {
         _: Elements<'_, '_>,
         _: Context<'_, Self::State>,
     ) {
-        *state.focused.to_mut() = false;
-    }
-
-    fn accept_focus(&self) -> bool {
-        true
+        state.focused.set(false)
     }
 
     fn tick(
@@ -229,6 +227,14 @@ fn main() {
         .unwrap();
 
     let editor_state = EditorState::new(editor_size, file.as_ref().map(PathBuf::as_path));
+    let input = runtime
+        .register_component(
+            "input",
+            release_bundle!("templates/input.aml"),
+            Input,
+            InputState::new("Search"),
+        )
+        .unwrap();
     let editor = runtime
         .register_component(
             "editor",

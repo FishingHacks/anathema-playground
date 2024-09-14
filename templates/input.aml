@@ -1,0 +1,12 @@
+container [height: 1]
+    hstack
+        text [bold: true] name ": "
+        if focused
+            border [width: width, height: 1, sides: [], background: "black", foreground: "white"]
+                expand [fill: " "]
+                    text [bold: true] input
+                        span [background: "white", foreground: "black"] " "
+        else
+            border [width: width, height: 1, sides: [], background: "dark_grey", foreground: "black"]
+                expand [fill: " "]
+                    text input

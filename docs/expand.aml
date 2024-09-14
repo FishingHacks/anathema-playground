@@ -1,0 +1,124 @@
+let THEME = {
+    number: "dark_yellow",
+    string: "green",
+    braces: "blue",
+    boolean: "magenta",
+    component: "dark_magenta",
+    widget: "cyan",
+    hex_val: "dark_blue",
+    comment: "dark_grey",
+    code_block: #333,
+}
+
+vstack
+    text [bold: true] "Expand ("
+        span [background: THEME.code_block] "expand"
+        span ")"
+    text " "
+    text "Expand the element to fill the remaining space."
+    text "Accepts one child."
+    text "The layout process works as follows:"
+    text "First all elements that are not expand or spacer will be laid out. The remaining space will be distributed between expand then spacer in that order, meaning if one expand exists followed by a spacer the expand will consume all remaining space, leaving the spacer zero sized."
+    text "The size is distributed evenly between all expands."
+    text "To alter the distribution factor set the factor attribute."
+    text " "
+    text " "
+    text [bold: true] "Example:"
+    container [width: 60, background: THEME.code_block]
+        vstack
+            text ""
+                span [foreground: THEME.widget] "border"
+                span [foreground: THEME.braces] " ["
+                span "width: "
+                span [foreground: THEME.number] "10"
+                span ", height: "
+                span [foreground: THEME.number] "11"
+                span [foreground: THEME.braces] "]"
+            text [foreground: THEME.widget] "    vstack"
+            text [foreground: THEME.widget] "        expand"
+            text [foreground: THEME.widget] "        expand"
+            text [foreground: THEME.widget] "            border"
+            text [foreground: THEME.widget] "                expand"
+            text [foreground: THEME.widget] "                    text "
+                span [foreground: THEME.string] '"top"'
+            text [foreground: THEME.widget] "        expand"
+            text [foreground: THEME.widget] "            border"
+            text [foreground: THEME.widget] "                expand"
+            text [foreground: THEME.widget] "                    text "
+                span [foreground: THEME.string] '"bottom"'
+            text [foreground: THEME.widget] "        text "
+                span [foreground: THEME.string] '"footer"'
+    text " "
+    container [width: 60, background: THEME.code_block]
+        vstack
+            text "┌────────┐"
+            text "│┌──────┐│"
+            text "││top   ││"
+            text "││      ││"
+            text "│└──────┘│"
+            text "│┌──────┐│"
+            text "││bottom││"
+            text "││      ││"
+            text "│└──────┘│"
+            text "│footer  │"
+            text "└────────┘"
+    text " "
+    text " "
+    text [bold: true] "Attribute"
+    text [foreground: "red"] "- "
+        span [foreground: "reset", bold: true] "factor"
+    text "The factor decides the amount of space to distribute between the "
+        span [background: THEME.code_block] "expand"
+        span "s."
+    text "Given a height of 3 and two "
+        span [background: THEME.code_block] "expand"
+        span " widgets, the height would be divided by two."
+    text "If one of the "
+        span [background: THEME.code_block] "expand"
+        span " widgets had a "
+        span [background: THEME.code_block] "factor"
+        span " of two, then it would receive 2 of the total height, and the remaining widget would receive 1."
+    text " "
+    text [foreground: "red"] "- "
+        span [foreground: "reset", bold: true] "axis"
+    text "Expand along an axis."
+    text "Valid values:"
+    text "  - "
+        span [background: THEME.code_block] '"horz"'
+        span " | "
+        span [background: THEME.code_block] '"horizontal"'
+    text "  - "
+        span [background: THEME.code_block] '"vert"'
+        span " | "
+        span [background: THEME.code_block] '"vertical"'
+    text " "
+    text [foreground: "red"] "- "
+        span [foreground: "reset", bold: true] "fill"
+    text "Fill the unpainted space with a string."
+    text "Example:"
+    container [width: 60, background: THEME.code_block]
+        vstack
+            text ""
+                span [foreground: THEME.widget] "border "
+                span [foreground: THEME.braces] "["
+                span "width: "
+                span [foreground: THEME.number] "10"
+                span ", height: "
+                span [foreground: THEME.number] "5"
+                span [foreground: THEME.braces] "]"
+            text "    "
+                span [foreground: THEME.widget] "expand "
+                span [foreground: THEME.braces] "["
+                span "fill: "
+                span [foreground: THEME.string] '"+-"'
+                span [foreground: THEME.braces] "]"
+            text [foreground: THEME.widget] "text "
+                span [foreground: THEME.string] '"Hello"'
+    text " "
+    container [width: 60, background: THEME.code_block]
+        vstack
+            text "┌────────┐"
+            text "│Hello-+-│"
+            text "│+-+-+-+-│"
+            text "│+-+-+-+-│"
+            text "└────────┘"

@@ -22,6 +22,7 @@ pub struct EditorState {
     width: Value<usize>,
     height: Value<usize>,
     focused: Value<bool>,
+    dirty: Value<bool>,
     file: Value<String>,
 }
 impl EditorState {
@@ -35,6 +36,7 @@ impl EditorState {
             width: size.width.into(),
             height: size.height.into(),
             focused: false.into(),
+            dirty: false.into(),
             file: filename.to_string().into(),
         }
     }
@@ -65,7 +67,7 @@ impl Editor {
         }
     }
 
-    fn run_code(&mut self, mut context: Context<'_, EditorState>) {
+    fn check_code(&mut self, mut context: Context<'_, EditorState>, dirty: &mut Value<bool>) {
         if let Some(handle) = THREAD_HANDLE.take() {
             handle.close();
         }
@@ -84,13 +86,16 @@ impl Editor {
                     context.publish("error", |state| &state.focused);
                     return;
                 }
-                if let Some(file) = self.file.as_ref() {
-                    if let Err(e) = std::fs::write(file, string.as_bytes()) {
-                        ERROR.replace(format!("Failed to write the template: {e:?}"));
-                        context.publish("error", |state| &state.focused);
-                        return;
-                    }
+                if let Some(e) = self
+                    .file
+                    .as_ref()
+                    .and_then(|path| std::fs::write(path, string.as_bytes()).err())
+                {
+                    ERROR.replace(format!("Failed to write the template: {e:?}"));
+                    context.publish("error", |state| &state.focused);
+                    return;
                 }
+                dirty.set(false);
                 match launch_threaded_anathema(string, context.viewport.size()) {
                     Err(e) => {
                         ERROR.replace(format!("Failed to write the template: {e:?}"));
@@ -178,7 +183,7 @@ impl Component for Editor {
         key: KeyEvent,
         state: &mut Self::State,
         elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        mut context: Context<'_, Self::State>,
     ) {
         if !*state.focused.to_ref() || matches!(key.state, KeyState::Release) {
             return;
@@ -186,11 +191,24 @@ impl Component for Editor {
 
         match key.code {
             KeyCode::Char('r') if key.ctrl => {
-                *state.focused.to_mut() = false;
+                state.focused.set(false);
                 self.should_rerender = 0;
-                return self.run_code(context);
+                return self.check_code(context, &mut state.dirty);
+            }
+            KeyCode::Char('s') if key.ctrl => {
+                if let Some(e) = self
+                    .file
+                    .as_ref()
+                    .and_then(|path| std::fs::write(path, self.buffer.to_string().as_bytes()).err())
+                {
+                    ERROR.replace(format!("Failed to write the template: {e:?}"));
+                    context.publish("error", |state| &state.focused);
+                } else {
+                    state.dirty.set(false);
+                }
             }
             KeyCode::Char(' ') if key.ctrl => {
+                state.dirty.set(true);
                 self.buffer.insert_char(' ');
                 self.buffer.insert_char(' ');
                 self.buffer.insert_char(' ');
@@ -198,14 +216,17 @@ impl Component for Editor {
                 self.buffer.highlight_current_line();
             }
             KeyCode::Char(c) => {
+                state.dirty.set(true);
                 self.buffer.insert_char(c);
                 self.buffer.highlight_current_line();
             }
             KeyCode::Enter => {
+                state.dirty.set(true);
                 self.buffer.insert_char('\n');
                 self.buffer.highlight_current_line()
             }
             KeyCode::Backspace => {
+                state.dirty.set(true);
                 self.buffer.remove_char_before();
                 self.buffer.highlight_current_line();
             }
@@ -243,17 +264,18 @@ impl Component for Editor {
         elements: Elements<'_, '_>,
         _: Context<'_, Self::State>,
     ) {
-        *state.focused.to_mut() = true;
+        state.focused.set(true);
         self.buffer.draw(elements, *state.focused.to_ref());
     }
 
     fn on_blur(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
+        elements: Elements<'_, '_>,
         _: Context<'_, Self::State>,
     ) {
-        *state.focused.to_mut() = false;
+        state.focused.set(false);
+        self.buffer.draw(elements, *state.focused.to_ref());
     }
 
     fn tick(
@@ -269,7 +291,16 @@ impl Component for Editor {
         }
     }
 
-    fn accept_focus(&self) -> bool {
-        true
+    fn receive(
+        &mut self,
+        ident: &str,
+        value: anathema::state::CommonVal<'_>,
+        state: &mut Self::State,
+        mut elements: Elements<'_, '_>,
+        mut context: Context<'_, Self::State>,
+    ) {
+        if ident == "search" {
+            let str = value.to_common_str().as_ref();
+        }
     }
 }

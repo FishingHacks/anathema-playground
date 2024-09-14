@@ -2,21 +2,23 @@ zstack
     border
         canvas [width: width || 1, height: height || 1]
     padding [left: 3, right: 3]
-        hstack
-            text "{ "
-                if focused
-                    span [bold: THEME.bold_file_focused, foreground: THEME.fg_file_focused] file
-                else
-                    span [bold: THEME.bold_file_unfocused, foreground: THEME.fg_file_unfocused] file
-                span " }"
-            spacer
+        vstack
+            hstack
+                text "{ "
+                    if focused
+                        span [bold: THEME.bold_file_focused, foreground: THEME.fg_file_focused] file
+                    else
+                        span [bold: THEME.bold_file_unfocused, foreground: THEME.fg_file_unfocused] file
+                    if dirty
+                        span [bold: true] "*"
+                text " | "
+                @input (submit->search) { width: width / 3 }
+                text " }"
+            expand
             if focused
                 text "{ "
                     span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-R"
                     span ": Run"
-                    span " | "
-                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-Q"
-                    span ": Search"
                     span " | "
                     span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-S"
                     span ": Save"
