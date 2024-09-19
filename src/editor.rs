@@ -6,9 +6,8 @@ use std::{
 use anathema::{
     component::{Component, KeyCode, KeyEvent},
     geometry::Size,
-    prelude::{Context, Document},
+    prelude::Context,
     state::{State, Value},
-    templates::blueprints::Blueprint,
     widgets::{components::events::KeyState, Elements},
 };
 
@@ -75,93 +74,17 @@ impl Editor {
         let string = self.buffer.to_string();
 
         self.should_rerender = 3;
-        match Document::new(string.clone()).compile() {
-            Err(e) => {
-                ERROR.replace(format!("Failed to compile the template: {e:?}"));
-                context.publish("error", |state| &state.focused);
-            }
-            Ok((blueprint, _)) => {
-                if let Err(e) = validate_blueprint(&blueprint) {
-                    ERROR.replace(format!("Failed to compile the template: {e}"));
-                    context.publish("error", |state| &state.focused);
-                    return;
-                }
-                if let Some(e) = self
-                    .file
-                    .as_ref()
-                    .and_then(|path| std::fs::write(path, string.as_bytes()).err())
-                {
-                    ERROR.replace(format!("Failed to write the template: {e:?}"));
-                    context.publish("error", |state| &state.focused);
-                    return;
-                }
-                dirty.set(false);
-                match launch_threaded_anathema(string, context.viewport.size()) {
-                    Err(e) => {
-                        ERROR.replace(format!("Failed to write the template: {e:?}"));
-                        context.publish("error", |state| &state.focused);
-                    }
-                    Ok(handle) => {
-                        context.publish("run", |state| &state.focused);
-                        THREAD_HANDLE.set(Some(handle));
-                    }
-                }
+        dirty.set(false);
+        match launch_threaded_anathema(string, context.viewport.size()) {
+            Err(_) => (),
+            Ok(handle) => {
+                context.publish("run", |state| &state.focused);
+                THREAD_HANDLE.set(Some(handle));
             }
         }
     }
 }
 
-pub static VALID_WIDGETS: &[&str] = &[
-    "text",
-    "span",
-    "border",
-    "align",
-    "vstack",
-    "hstack",
-    "zstack",
-    "expand",
-    "spacer",
-    "position",
-    "overflow",
-    "canvas",
-    "container",
-    "padding",
-    "row",
-    "column",
-];
-
-fn validate_blueprint<'a>(blueprint: &'a Blueprint) -> Result<(), String> {
-    let mut blueprints_to_validate: Vec<&'a Blueprint> = vec![blueprint];
-    while blueprints_to_validate.len() > 0 {
-        let Some(blueprint) = blueprints_to_validate.pop() else {
-            break;
-        };
-        match blueprint {
-            Blueprint::Component(component) => blueprints_to_validate.extend(component.body.iter()),
-            Blueprint::ControlFlow(control_flow) => blueprints_to_validate.extend(
-                control_flow.if_node.body.iter().chain(
-                    control_flow
-                        .elses
-                        .iter()
-                        .flat_map(|else_node| else_node.body.iter()),
-                ),
-            ),
-            Blueprint::For(for_loop) => blueprints_to_validate.extend(for_loop.body.iter()),
-            Blueprint::Single(widget) => {
-                blueprints_to_validate.extend(widget.children.iter());
-                if !VALID_WIDGETS
-                    .iter()
-                    .any(|widget_name| *widget.ident == **widget_name)
-                {
-                    return Err(format!("Could not find widget `{}`", &*widget.ident));
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
-thread_local!(pub static ERROR: RefCell<String> = Default::default());
 thread_local!(pub static THREAD_HANDLE: RefCell<Option<AnathemaThreadHandle>> = Default::default());
 
 impl Component for Editor {
@@ -183,7 +106,7 @@ impl Component for Editor {
         key: KeyEvent,
         state: &mut Self::State,
         elements: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        context: Context<'_, Self::State>,
     ) {
         if !*state.focused.to_ref() || matches!(key.state, KeyState::Release) {
             return;
@@ -196,14 +119,11 @@ impl Component for Editor {
                 return self.check_code(context, &mut state.dirty);
             }
             KeyCode::Char('s') if key.ctrl => {
-                if let Some(e) = self
+                if let None = self
                     .file
                     .as_ref()
                     .and_then(|path| std::fs::write(path, self.buffer.to_string().as_bytes()).err())
                 {
-                    ERROR.replace(format!("Failed to write the template: {e:?}"));
-                    context.publish("error", |state| &state.focused);
-                } else {
                     state.dirty.set(false);
                 }
             }
@@ -225,6 +145,11 @@ impl Component for Editor {
                 self.buffer.insert_char('\n');
                 self.buffer.highlight_current_line()
             }
+            KeyCode::Delete => {
+                state.dirty.set(true);
+                self.buffer.remove_char_after();
+                self.buffer.highlight_current_line();
+            }
             KeyCode::Backspace => {
                 state.dirty.set(true);
                 self.buffer.remove_char_before();
@@ -238,6 +163,20 @@ impl Component for Editor {
             KeyCode::Right => self.buffer.move_right(),
             KeyCode::Up => self.buffer.move_up(),
             KeyCode::Left => self.buffer.move_left(),
+            KeyCode::PageDown => {
+                self.buffer.move_down();
+                self.buffer.move_down();
+                self.buffer.move_down();
+                self.buffer.move_down();
+                self.buffer.move_down();
+            }
+            KeyCode::PageUp => {
+                self.buffer.move_up();
+                self.buffer.move_up();
+                self.buffer.move_up();
+                self.buffer.move_up();
+                self.buffer.move_up();
+            }
 
             _ => return,
         }
@@ -295,9 +234,9 @@ impl Component for Editor {
         &mut self,
         ident: &str,
         value: anathema::state::CommonVal<'_>,
-        state: &mut Self::State,
-        mut elements: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        _: &mut Self::State,
+        _: Elements<'_, '_>,
+        _: Context<'_, Self::State>,
     ) {
         if ident == "search" {
             let str = value.to_common_str().as_ref();

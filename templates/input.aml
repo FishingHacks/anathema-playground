@@ -4,8 +4,10 @@ container [height: 1]
         if focused
             border [width: width, height: 1, sides: [], background: "black", foreground: "white"]
                 expand [fill: " "]
-                    text [bold: true] input
-                        span [background: "white", foreground: "black"] " "
+                    zstack
+                        text [bold: true] input
+                        padding [left: position_x]
+                            container [width: 1, height: 1, inverse: true]
         else
             border [width: width, height: 1, sides: [], background: "dark_grey", foreground: "black"]
                 expand [fill: " "]

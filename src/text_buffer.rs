@@ -1,11 +1,25 @@
 use anathema::{
-    backend::tui::{Color, Style},
-    default_widgets::Canvas,
-    geometry::Size,
-    widgets::Elements,
+    backend::tui::Style, default_widgets::Canvas, geometry::Size, state::Color, widgets::Elements,
 };
 
-use crate::editor::VALID_WIDGETS;
+pub static VALID_WIDGETS: &[&str] = &[
+    "text",
+    "span",
+    "border",
+    "align",
+    "vstack",
+    "hstack",
+    "zstack",
+    "expand",
+    "spacer",
+    "position",
+    "overflow",
+    "canvas",
+    "container",
+    "padding",
+    "row",
+    "column",
+];
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -26,13 +40,13 @@ impl HighlightingStyle {
         let mut style = Style::new();
         match self {
             Self::None => {}
-            Self::Number => style.set_fg(Color::DarkYellow),
+            Self::Number => style.set_fg(Color::Yellow),
             Self::String => style.set_fg(Color::Green),
-            Self::Braces => style.set_fg(Color::Blue),
-            Self::Boolean => style.set_fg(Color::Magenta),
-            Self::Component => style.set_fg(Color::DarkMagenta),
+            Self::Braces => style.set_fg(Color::LightBlue),
+            Self::Boolean => style.set_fg(Color::LightMagenta),
+            Self::Component => style.set_fg(Color::Magenta),
             Self::Widget => style.set_fg(Color::Cyan),
-            Self::HexVal => style.set_fg(Color::DarkBlue),
+            Self::HexVal => style.set_fg(Color::Blue),
             Self::Comment => {
                 style.set_fg(Color::DarkGrey);
                 style.set_italic(true);
@@ -62,17 +76,6 @@ pub struct TextBuffer {
 
 // editing
 impl TextBuffer {
-    pub fn new(width: usize, height: usize) -> Self {
-        Self {
-            lines: vec![vec![]],
-            offset_y: 0,
-            cursor_x: 0,
-            cursor_y: 0,
-            width,
-            height,
-        }
-    }
-
     pub fn from_iter(mut iter: impl Iterator<Item = char>, width: usize, height: usize) -> Self {
         let mut lines = vec![vec![]];
         while let Some(c) = iter.next() {
@@ -152,48 +155,28 @@ impl TextBuffer {
         }
     }
 
-    pub fn remove_char_before(&mut self) {
-        if self.cursor_y + self.offset_y == 0 && self.cursor_x == 0 {
-        } else {
-            if let Some(line) = self.lines.get_mut(self.cursor_y + self.offset_y) {
-                if self.cursor_x == 0 {
-                    if self.cursor_y + self.offset_y == 0 {
-                        return;
-                    }
-                    let line = self.lines.remove(self.cursor_y + self.offset_y);
-                    self.cursor_x = self.lines[self.cursor_y + self.offset_y - 1].len();
-                    self.lines[self.cursor_y + self.offset_y - 1].extend(line.iter().copied());
-
-                    if self.cursor_y == 0 {
-                        self.offset_y -= 1;
-                    } else {
-                        self.cursor_y -= 1;
-                    }
-                } else if self.cursor_x >= line.len() {
-                    line.pop();
-                    self.cursor_x = line.len();
-                } else {
-                    line.remove(self.cursor_x - 1);
-                    self.cursor_x -= 1;
-                }
-            } else {
-                if self.cursor_y + self.offset_y >= self.lines.len() {
-                    if self.offset_y >= self.lines.len() {
-                        self.offset_y = self.lines.len().saturating_sub(1);
-                    }
-                    self.cursor_y = self.lines.len() - self.offset_y;
-                }
-
-                if self.cursor_y + self.offset_y >= self.height {
-                    self.offset_y = self.cursor_y + self.offset_y - self.height + 1;
-                    self.cursor_y = self.height - 1;
-                }
-                self.cursor_x = self
-                    .lines
-                    .get(self.cursor_y + self.offset_y)
-                    .map(Vec::len)
-                    .unwrap_or_default();
+    pub fn remove_char_after(&mut self) {
+        if let Some(line) = self.lines.get_mut(self.cursor_y + self.offset_y) {
+            if self.cursor_x < line.len() {
+                _ = line.remove(self.cursor_x);
+            } else if self.cursor_y + self.offset_y + 1 < self.lines.len() {
+                let next_line = self.lines.remove(self.cursor_y + self.offset_y + 1);
+                self.lines[self.cursor_y + self.offset_y].extend(next_line.into_iter());
             }
+        } else {
+            self.cursor_y = self.lines.len() - 1;
+            self.offset_y = 0;
+            if self.cursor_y + self.offset_y >= self.height {
+                self.offset_y = self.cursor_y + self.offset_y - self.height + 1;
+                self.cursor_y = self.height - 1;
+            }
+        }
+    }
+
+    pub fn remove_char_before(&mut self) {
+        if self.cursor_y + self.offset_y != 0 || self.cursor_x != 0 {
+            self.move_left();
+            self.remove_char_after();
         }
     }
 

@@ -8,19 +8,12 @@ let THEME = {
 }
 
 if showing == "Editor"
-    @editor (run->run_aml, error->editor_error)
-else if showing == "Error"
-    @error { errors: showing.errors }
+    @editor (run->run_aml, error->editor_error) [id: "editor"]
 else
     zstack
         canvas [width: width || 1, height: height || 1, id: "preview"]
         hstack
             spacer
-            if focused
-                text "Press "
-                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl+E"
-                    span " to get back to the editor  "
-            else
-                text "Press "
-                    span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Tab"
-                    span " to focus  "
+            text "Press "
+                span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Tab"
+                span " to get back to the editor  "

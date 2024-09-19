@@ -1,7 +1,0 @@
-vstack
-    text [bold: true] "Press Ctrl+E to get back to the editor"
-    align [alignment: "center"]
-        border [background: "red"]
-            vstack
-                for line in errors
-                    text [foreground: "back"] line

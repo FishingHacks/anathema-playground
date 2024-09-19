@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "anathema"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-backend",
  "anathema-debug",
@@ -20,7 +20,7 @@ dependencies = [
 
 [[package]]
 name = "anathema-backend"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-geometry",
  "anathema-state",
@@ -34,11 +34,11 @@ dependencies = [
 
 [[package]]
 name = "anathema-debug"
-version = "0.3.0"
+version = "0.2.0"
 
 [[package]]
 name = "anathema-default-widgets"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-backend",
  "anathema-geometry",
@@ -52,7 +52,7 @@ dependencies = [
 
 [[package]]
 name = "anathema-geometry"
-version = "0.3.0"
+version = "0.2.0"
 
 [[package]]
 name = "anathema-playground"
@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "anathema-runtime"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-backend",
  "anathema-debug",
@@ -79,7 +79,7 @@ dependencies = [
 
 [[package]]
 name = "anathema-state"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-debug",
  "anathema-state-derive",
@@ -88,7 +88,7 @@ dependencies = [
 
 [[package]]
 name = "anathema-state-derive"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "manyhow",
  "quote",
@@ -98,14 +98,14 @@ dependencies = [
 
 [[package]]
 name = "anathema-store"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-debug",
 ]
 
 [[package]]
 name = "anathema-templates"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-debug",
  "anathema-state",
@@ -114,13 +114,14 @@ dependencies = [
 
 [[package]]
 name = "anathema-widgets"
-version = "0.3.0"
+version = "0.2.0"
 dependencies = [
  "anathema-debug",
  "anathema-geometry",
  "anathema-state",
  "anathema-store",
  "anathema-templates",
+ "finl_unicode",
  "flume",
  "unicode-width",
 ]
@@ -216,6 +217,12 @@ dependencies = [
  "libredox",
  "windows-sys 0.59.0",
 ]
+
+[[package]]
+name = "finl_unicode"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
 
 [[package]]
 name = "flume"
