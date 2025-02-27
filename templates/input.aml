@@ -1,14 +1,14 @@
 container [height: 1]
     hstack
-        text [bold: true] name ": "
-        if focused
-            border [width: width, height: 1, sides: [], background: "black", foreground: "white"]
+        text [bold: true] state.name ": "
+        if state.focused
+            border [width: attributes.width, height: 1, sides: [], background: "black", foreground: "white"]
                 expand [fill: " "]
                     zstack
-                        text [bold: true] input
-                        padding [left: position_x]
+                        text [bold: true] state.value
+                        padding [left: state.position_x]
                             container [width: 1, height: 1, inverse: true]
         else
-            border [width: width, height: 1, sides: [], background: "dark_grey", foreground: "black"]
+            border [width: attributes.width, height: 1, sides: [], background: "dark_grey", foreground: "black"]
                 expand [fill: " "]
-                    text input
+                    text state.value

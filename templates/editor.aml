@@ -1,21 +1,21 @@
 zstack
     border
-        canvas [width: width || 1, height: height || 1]
+        canvas [width: state.width || 1, height: state.height || 1, id: "editor"]
     padding [left: 3, right: 3]
         vstack
             hstack
                 text "{ "
-                    if focused
-                        span [bold: THEME.bold_file_focused, foreground: THEME.fg_file_focused] file
+                    if state.focused
+                        span [bold: THEME.bold_file_focused, foreground: THEME.fg_file_focused] state.file
                     else
-                        span [bold: THEME.bold_file_unfocused, foreground: THEME.fg_file_unfocused] file
-                    if dirty
+                        span [bold: THEME.bold_file_unfocused, foreground: THEME.fg_file_unfocused] state.file
+                    if state.dirty
                         span [bold: true] "*"
                 text " | "
-                @input (submit->search) { width: width / 3 }
+                //@input (submit->search) [width: state.width / 3]
                 text " }"
             expand
-            if focused
+            if state.focused
                 text "{ "
                     span [bold: THEME.bold_keybind, foreground: THEME.fg_keybind] "Ctrl-R"
                     span ": Run"

@@ -1,5 +1,7 @@
+use std::fmt::{Display, Write};
+
 use anathema::{
-    backend::tui::Style, default_widgets::Canvas, geometry::Size, state::Color, widgets::Elements,
+    backend::tui::Style, component::Children, default_widgets::Canvas, geometry::Size, state::Color,
 };
 
 pub static VALID_WIDGETS: &[&str] = &[
@@ -36,7 +38,7 @@ pub enum HighlightingStyle {
 }
 
 impl HighlightingStyle {
-    pub fn to_style(&self) -> Style {
+    pub fn to_style(self) -> Style {
         let mut style = Style::new();
         match self {
             Self::None => {}
@@ -76,9 +78,9 @@ pub struct TextBuffer {
 
 // editing
 impl TextBuffer {
-    pub fn from_iter(mut iter: impl Iterator<Item = char>, width: usize, height: usize) -> Self {
+    pub fn from_iter(iter: impl Iterator<Item = char>, width: usize, height: usize) -> Self {
         let mut lines = vec![vec![]];
-        while let Some(c) = iter.next() {
+        for c in iter {
             if c == '\n' {
                 lines.push(vec![]);
             } else {
@@ -161,7 +163,7 @@ impl TextBuffer {
                 _ = line.remove(self.cursor_x);
             } else if self.cursor_y + self.offset_y + 1 < self.lines.len() {
                 let next_line = self.lines.remove(self.cursor_y + self.offset_y + 1);
-                self.lines[self.cursor_y + self.offset_y].extend(next_line.into_iter());
+                self.lines[self.cursor_y + self.offset_y].extend(next_line);
             }
         } else {
             self.cursor_y = self.lines.len() - 1;
@@ -204,7 +206,7 @@ impl TextBuffer {
     }
 
     pub fn move_to_lineend(&mut self) {
-        if self.lines.len() == 0 {
+        if self.lines.is_empty() {
             self.cursor_x = 0;
             self.cursor_y = 0;
             self.offset_y = 0;
@@ -229,7 +231,7 @@ impl TextBuffer {
             if let Some(len) = self.lines.get(self.cursor_y + self.offset_y).map(Vec::len) {
                 self.cursor_x = self.cursor_x.min(len);
             }
-        } else if self.lines.len() == 0 {
+        } else if self.lines.is_empty() {
             self.cursor_x = 0;
             self.cursor_y = 0;
             self.offset_y = 0;
@@ -251,7 +253,7 @@ impl TextBuffer {
             }
             self.cursor_y = self.lines.len() - self.offset_y;
         }
-        if self.lines.len() == 0 {
+        if self.lines.is_empty() {
             return;
         }
         if self.cursor_x
@@ -318,43 +320,49 @@ impl TextBuffer {
     }
 }
 
+impl Display for TextBuffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (idx, line) in self.lines.iter().enumerate() {
+            if idx != 0 {
+                f.write_char('\n')?
+            }
+            for c in line {
+                f.write_char(c.0)?;
+            }
+        }
+        Ok(())
+    }
+}
+
 // drawing
 impl TextBuffer {
-    pub fn to_string(&self) -> String {
-        let mut string = String::with_capacity(self.lines.len() * 20);
-
-        for line in self.lines.iter() {
-            string.extend(line.iter().map(|v| v.0));
-            string.push('\n');
-        }
-        string.pop();
-
-        string
-    }
-
     pub fn resize(&mut self, new_width: usize, new_height: usize) {
         self.width = new_width;
         self.height = new_height;
     }
 
-    pub fn draw(&self, mut elements: Elements, draw_cursor: bool) {
-        elements.by_tag("canvas").first(|el, _| {
-            let size = el.size();
-            if let Some(canvas) = el.try_to::<Canvas>() {
-                self.draw_to_canvas(canvas, draw_cursor, size);
-            }
-        });
+    pub fn draw(&self, mut elements: Children<'_, '_>, draw_cursor: bool) {
+        elements
+            .elements()
+            .by_tag("canvas")
+            .by_attribute("id", "editor")
+            .first(|el, _| {
+                let size = el.size();
+                if let Some(canvas) = el.try_to::<Canvas>() {
+                    self.draw_to_canvas(canvas, draw_cursor, size);
+                }
+            });
     }
 
     fn draw_to_canvas(&self, canvas: &mut Canvas, draw_cursor: bool, size: Size) {
         for y in 0..size.height {
             let mut line = self
                 .lines
-                .get(y + self.offset_y)
+                .get(y as usize + self.offset_y)
                 .map(|v| v.iter())
                 .unwrap_or_default();
 
-            let line_num = (self.offset_y + y + 1).to_string();
+            let line_num = (self.offset_y + y as usize + 1).to_string();
             let line_num = format!("{}{} ", " ".repeat(4 - line_num.len()), line_num);
 
             let mut line_num_style = Style::new();
@@ -364,15 +372,15 @@ impl TextBuffer {
                 canvas.put(
                     line_num.chars().nth(x).unwrap(),
                     line_num_style,
-                    (x as u16, y as u16),
+                    (x as u16, y),
                 );
             }
 
             // probably safe to assume we wont have to show line numbers with more than 3 digits
             for x in 5..size.width {
                 match line.next() {
-                    Some(c) => canvas.put(c.0, c.1.to_style(), (x as u16, y as u16)),
-                    None => canvas.erase((x as u16, y as u16)),
+                    Some(c) => canvas.put(c.0, c.1.to_style(), (x, y)),
+                    None => canvas.erase((x, y)),
                 }
             }
         }
@@ -458,7 +466,7 @@ impl TextBuffer {
                     cur.clear();
                     highlight_state = HighlightState::None;
                 }
-                HighlightState::Hex if matches!(char, 'a'..='f' | 'A'..='F' | '0'..='9') => (),
+                HighlightState::Hex if char.is_ascii_hexdigit() => (),
                 HighlightState::Hex => {
                     line[started_at..current]
                         .iter_mut()
@@ -466,9 +474,8 @@ impl TextBuffer {
                     highlight_state = HighlightState::None;
                 }
                 HighlightState::None => (),
-                HighlightState::Component if matches!(char, 'a'..='z' | 'A'..='Z' | '_' | '|' | '0'..='9') => {
-                    ()
-                }
+                HighlightState::Component if matches!(char, 'a'..='z' | 'A'..='Z' | '_' | '|' | '0'..='9') =>
+                    {}
                 HighlightState::Component => {
                     line[started_at..current]
                         .iter_mut()

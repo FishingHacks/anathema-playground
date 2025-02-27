@@ -1,17 +1,13 @@
 use std::{
     cell::RefCell,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
-use anathema::{
-    component::{Component, KeyCode, KeyEvent},
-    geometry::Size,
-    prelude::Context,
-    state::{State, Value},
-    widgets::{components::events::KeyState, Elements},
-};
+use anathema::{component::*, geometry::Size};
 
 use crate::{
+    input::InputState,
     text_buffer::TextBuffer,
     thread_backend::{launch_threaded_anathema, AnathemaThreadHandle},
 };
@@ -32,8 +28,8 @@ impl EditorState {
             .unwrap_or("template.aml");
 
         Self {
-            width: size.width.into(),
-            height: size.height.into(),
+            width: Value::new(size.width as usize),
+            height: Value::new(size.height as usize),
             focused: false.into(),
             dirty: false.into(),
             file: filename.to_string().into(),
@@ -56,7 +52,8 @@ impl Editor {
             }
             None => "vstack\n",
         };
-        let mut buffer = TextBuffer::from_iter(lines.chars(), size.width, size.height);
+        let mut buffer =
+            TextBuffer::from_iter(lines.chars(), size.width as usize, size.height as usize);
         buffer.highlight_all();
 
         Self {
@@ -66,7 +63,7 @@ impl Editor {
         }
     }
 
-    fn check_code(&mut self, mut context: Context<'_, EditorState>, dirty: &mut Value<bool>) {
+    fn check_code(&mut self, mut context: Context<'_, '_, EditorState>, dirty: &mut Value<bool>) {
         if let Some(handle) = THREAD_HANDLE.take() {
             handle.close();
         }
@@ -78,7 +75,7 @@ impl Editor {
         match launch_threaded_anathema(string, context.viewport.size()) {
             Err(_) => (),
             Ok(handle) => {
-                context.publish("run", |state| &state.focused);
+                context.publish("run");
                 THREAD_HANDLE.set(Some(handle));
             }
         }
@@ -95,8 +92,8 @@ impl Component for Editor {
         &mut self,
         _: Self::Message,
         _: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
+        _: Children<'_, '_>,
+        _: Context<'_, '_, Self::State>,
     ) {
         self.should_rerender = 3;
     }
@@ -105,8 +102,8 @@ impl Component for Editor {
         &mut self,
         key: KeyEvent,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        elements: Children<'_, '_>,
+        context: Context<'_, '_, Self::State>,
     ) {
         if !*state.focused.to_ref() || matches!(key.state, KeyState::Release) {
             return;
@@ -119,10 +116,11 @@ impl Component for Editor {
                 return self.check_code(context, &mut state.dirty);
             }
             KeyCode::Char('s') if key.ctrl => {
-                if let None = self
+                if self
                     .file
                     .as_ref()
                     .and_then(|path| std::fs::write(path, self.buffer.to_string().as_bytes()).err())
+                    .is_none()
                 {
                     state.dirty.set(false);
                 }
@@ -187,21 +185,22 @@ impl Component for Editor {
     fn resize(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        _: Children<'_, '_>,
+        context: Context<'_, '_, Self::State>,
     ) {
         let size = context.viewport.size();
-        *state.height.to_mut() = size.height - 2;
-        *state.width.to_mut() = size.width - 2;
-        self.buffer.resize(size.width, size.height);
+        *state.height.to_mut() = size.height as usize - 2;
+        *state.width.to_mut() = size.width as usize - 2;
+        self.buffer
+            .resize(size.width as usize, size.height as usize);
         self.should_rerender = 3;
     }
 
     fn on_focus(
         &mut self,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
+        elements: Children<'_, '_>,
+        _: Context<'_, '_, Self::State>,
     ) {
         state.focused.set(true);
         self.buffer.draw(elements, *state.focused.to_ref());
@@ -210,8 +209,8 @@ impl Component for Editor {
     fn on_blur(
         &mut self,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
+        elements: Children<'_, '_>,
+        _: Context<'_, '_, Self::State>,
     ) {
         state.focused.set(false);
         self.buffer.draw(elements, *state.focused.to_ref());
@@ -220,9 +219,9 @@ impl Component for Editor {
     fn tick(
         &mut self,
         state: &mut Self::State,
-        elements: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
-        _: std::time::Duration,
+        elements: Children<'_, '_>,
+        _: Context<'_, '_, Self::State>,
+        _: Duration,
     ) {
         if self.should_rerender > 0 {
             self.buffer.draw(elements, *state.focused.to_ref());
@@ -233,13 +232,13 @@ impl Component for Editor {
     fn receive(
         &mut self,
         ident: &str,
-        value: anathema::state::CommonVal<'_>,
+        value: &dyn AnyState,
         _: &mut Self::State,
-        _: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
+        _: Children<'_, '_>,
+        _: Context<'_, '_, Self::State>,
     ) {
         if ident == "search" {
-            let str = value.to_common_str().as_ref();
+            let _: &str = value.to::<InputState>().value.to_ref().as_ref();
         }
     }
 }

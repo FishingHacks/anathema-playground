@@ -7,8 +7,8 @@ let THEME = {
     bold_keybind: true,
 }
 
-if showing == "Editor"
-    @editor (run->run_aml, error->editor_error) [id: "editor"]
+if state.showing == "Editor"
+    @editor (run->run_aml, error->editor_error)
 else
     zstack
         canvas [width: width || 1, height: height || 1, id: "preview"]

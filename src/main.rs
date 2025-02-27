@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
-use anathema::{backend::Backend, component::*, default_widgets::Canvas, prelude::*};
+use anathema::{component::*, default_widgets::Canvas, prelude::*};
 use editor::{Editor, EditorState, THREAD_HANDLE};
 use input::{Input, InputState};
 use thread_backend::AnathemaThreadHandle;
@@ -12,10 +12,21 @@ mod thread_backend;
 
 struct Playground(ComponentId<()>);
 
-#[derive(State)]
+//#[derive(State)]
 enum Showing {
     Editor,
     Preview,
+}
+impl anathema::component::State for Showing {
+    fn type_info(&self) -> anathema::state::Type {
+        anathema::state::Type::String
+    }
+    fn as_str(&self) -> Option<&str> {
+        match self {
+            Showing::Editor => Some("Editor"),
+            Showing::Preview => Some("Preview"),
+        }
+    }
 }
 
 #[derive(State)]
@@ -32,13 +43,14 @@ impl Component for Playground {
     fn receive(
         &mut self,
         ident: &str,
-        _: CommonVal<'_>,
+        _: &dyn AnyState,
         state: &mut Self::State,
-        mut elements: Elements<'_, '_>,
-        mut ctx: Context<'_, Self::State>,
+        mut elements: Children<'_, '_>,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         if ident == "run_aml" {
             elements
+                .elements()
                 .by_tag("canvas")
                 .by_attribute("id", "preview")
                 .first(|element, _| {
@@ -47,42 +59,42 @@ impl Component for Playground {
                         return;
                     };
 
-                    for y in 0..canvas_size.height as u16 {
-                        for x in 0..canvas_size.width as u16 {
+                    for y in 0..canvas_size.height {
+                        for x in 0..canvas_size.width {
                             canvas.erase((x, y));
                         }
                     }
                 });
             *state.showing.to_mut() = Showing::Preview;
-            ctx.set_focus("id", "main");
+            context.components.by_name("main").focus();
         }
     }
 
     fn on_blur(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        ctx: Context<'_, Self::State>,
+        _: Children<'_, '_>,
+        context: Context<'_, '_, Self::State>,
     ) {
         if let Some(handle) = THREAD_HANDLE.take() {
             handle.close();
         }
         *state.showing.to_mut() = Showing::Editor;
-        _ = ctx.emit(self.0, ());
+        context.emit(self.0, ());
     }
 
     fn tick(
         &mut self,
         _: &mut Self::State,
-        mut elements: Elements<'_, '_>,
-        _: Context<'_, Self::State>,
-        _: std::time::Duration,
+        mut elements: Children<'_, '_>,
+        _: Context<'_, '_, Self::State>,
+        _: Duration,
     ) {
         let maybe_buffer = THREAD_HANDLE.with_borrow_mut(|maybe_handle| {
             if let Some(handle) = maybe_handle {
                 match handle.get_buffer() {
                     Err(_) => {
-                        maybe_handle.take().map(AnathemaThreadHandle::close);
+                        _ = maybe_handle.take().map(AnathemaThreadHandle::close);
                         None
                     }
                     Ok(v) => v,
@@ -96,7 +108,7 @@ impl Component for Playground {
         };
 
         elements
-            .by_tag("canvas")
+            .elements()
             .by_attribute("id", "preview")
             .first(|element, _| {
                 let canvas_size = element.size();
@@ -108,11 +120,11 @@ impl Component for Playground {
                 for y in 0..canvas_size.height {
                     for x in 0..canvas_size.width {
                         if x < buffer_size.width && y < buffer_size.height {
-                            let (char, style) = buffer.get(x, y);
+                            let (char, style) = buffer.get(x as usize, y as usize);
                             if *char != '\0' {
-                                canvas.put(*char, *style, (x as u16, y as u16));
+                                canvas.put(*char, *style, (x, y));
                             } else {
-                                canvas.erase((x as u16, y as u16));
+                                canvas.erase((x, y));
                             }
                         }
                     }
@@ -123,17 +135,17 @@ impl Component for Playground {
     fn resize(
         &mut self,
         state: &mut Self::State,
-        _: Elements<'_, '_>,
-        context: Context<'_, Self::State>,
+        _: Children<'_, '_>,
+        context: Context<'_, '_, Self::State>,
     ) {
         let size = context.viewport.size();
-        *state.width.to_mut() = size.width;
-        *state.height.to_mut() = size.height;
+        *state.width.to_mut() = size.width as usize;
+        *state.height.to_mut() = size.height as usize;
 
         THREAD_HANDLE.with_borrow_mut(|maybe_handle| {
             if let Some(handle) = maybe_handle {
-                if let Err(_) = handle.resize(size.width as u16, size.height as u16) {
-                    maybe_handle.take().map(AnathemaThreadHandle::close);
+                if handle.resize(size.width, size.height).is_err() {
+                    _ = maybe_handle.take().map(AnathemaThreadHandle::close);
                 }
             }
         });
@@ -142,11 +154,11 @@ impl Component for Playground {
     fn on_focus(
         &mut self,
         _: &mut Self::State,
-        _: Elements<'_, '_>,
-        mut context: Context<'_, Self::State>,
+        _: Children<'_, '_>,
+        mut context: Context<'_, '_, Self::State>,
     ) {
         if THREAD_HANDLE.with_borrow(|maybe_handle| maybe_handle.is_none()) {
-            context.set_focus("id", "editor");
+            context.components.by_name("editor").focus();
         }
     }
 
@@ -175,7 +187,7 @@ fn main() {
         current_executable = path.to_path_buf();
     }
 
-    let file = match std::env::args().skip(1).next() {
+    let file = match std::env::args().nth(1) {
         Some(v) if v == "-h" || v == "--help" => {
             println!("Usage: {} [options] [path]\n", current_executable.display());
             println!("  -h --help: Display help information\n");
@@ -201,22 +213,23 @@ fn main() {
         _ => None,
     };
 
-    let backend = TuiBackend::builder()
-        .enable_alt_screen()
+    let mut backend = TuiBackend::builder()
+        //.enable_alt_screen()
         .enable_raw_mode()
         .hide_cursor()
         .finish()
         .expect("failed to build the backend");
+    backend.finalize();
 
     let mut editor_size = backend.size();
     editor_size.width -= 2;
     editor_size.height -= 2;
     let size = backend.size();
 
-    let mut runtime = Runtime::builder(Document::new("@main [id: \"main\"]"), backend);
-    let editor_state = EditorState::new(editor_size, file.as_ref().map(PathBuf::as_path));
+    let mut runtime = Runtime::builder(Document::new("@main"), &backend);
+    let editor_state = EditorState::new(editor_size, file.as_deref());
     runtime
-        .register_component(
+        .component(
             "input",
             release_bundle!("templates/input.aml"),
             Input,
@@ -224,7 +237,7 @@ fn main() {
         )
         .unwrap();
     let editor = runtime
-        .register_component(
+        .component(
             "editor",
             release_bundle!("templates/editor.aml"),
             Editor::new(file, editor_size),
@@ -233,39 +246,18 @@ fn main() {
         .unwrap();
 
     runtime
-        .register_component(
+        .component(
             "main",
             release_bundle!("templates/main.aml"),
             Playground(editor),
             PlaygroundState {
                 showing: Showing::Editor.into(),
-                width: size.width.into(),
-                height: size.height.into(),
+                width: Value::new(size.width as usize),
+                height: Value::new(size.width as usize),
             },
         )
         .unwrap();
 
-    let runtime = runtime.set_global_event_handler(GlobalEventHandler);
-
-    let mut rt = runtime.finish().expect("failed to build the runtime");
-    rt.fps = 60;
-    rt.run();
-}
-
-struct GlobalEventHandler;
-
-impl GlobalEvents for GlobalEventHandler {
-    // do manual tabbing
-    fn enable_tab_navigation(&mut self) -> bool {
-        true
-    }
-
-    fn handle(
-        &mut self,
-        event: Event,
-        _: &mut Elements<'_, '_>,
-        _: &mut GlobalContext<'_>,
-    ) -> Option<Event> {
-        Some(event)
-    }
+    runtime.fps(60);
+    runtime.finish(|v| v.run(&mut backend)).unwrap();
 }

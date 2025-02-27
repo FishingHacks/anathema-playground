@@ -1,14 +1,16 @@
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::thread::JoinHandle;
 
-use anathema::backend::tui::{Buffer, Style};
-use anathema::backend::Backend;
+use anathema::backend::{
+    tui::{Buffer, Style},
+    Backend,
+};
 use anathema::geometry::{LocalPos, Pos, Size};
 use anathema::prelude::Document;
+use anathema::resolver::Attributes;
 use anathema::runtime::Runtime;
 use anathema::widgets::components::events::Event;
-use anathema::widgets::paint::{CellAttributes, Glyph};
-use anathema::widgets::{GlyphMap, WidgetRenderer};
+use anathema::widgets::{paint::Glyph, GlyphMap, WidgetRenderer};
 
 struct BufferRender<'a>(&'a mut Buffer);
 
@@ -20,8 +22,8 @@ impl WidgetRenderer for BufferRender<'_> {
         self.0.put_glyph(glyph, screen_pos);
     }
 
-    fn set_attributes(&mut self, attribs: &dyn CellAttributes, pos: Pos) {
-        let Ok(screen_pos) = pos.try_into() else {
+    fn set_attributes(&mut self, attribs: &Attributes<'_>, local_pos: Pos) {
+        let Ok(screen_pos) = local_pos.try_into() else {
             return;
         };
         let style = Style::from_cell_attribs(attribs);
@@ -30,6 +32,13 @@ impl WidgetRenderer for BufferRender<'_> {
 
     fn size(&self) -> Size {
         self.0.size()
+    }
+
+    fn set_style(&mut self, style: Style, local_pos: Pos) {
+        let Ok(pos) = local_pos.try_into() else {
+            return;
+        };
+        self.0.update_cell(style, pos);
     }
 }
 
@@ -83,47 +92,54 @@ impl Backend for ThreadBackend {
             Err(TryRecvError::Empty) => None,
             Err(_) => Some(Event::Stop), // if the connection is closed, close the thread
             Ok(ThreadEvent::Quit) => Some(Event::Stop),
-            Ok(ThreadEvent::Resize { width, height }) => Some(Event::Resize(width, height)),
+            Ok(ThreadEvent::Resize { width, height }) => {
+                Some(Event::Resize(Size::new(width, height)))
+            }
         }
     }
 
-    fn resize(&mut self, new_size: Size) {
+    fn resize(&mut self, new_size: Size, glyph_map: &mut GlyphMap) {
+        self.clear();
+
+        self.render(glyph_map);
+
         self.buffer.resize(new_size);
     }
 
     fn paint<'bp>(
         &mut self,
         glyph_map: &mut GlyphMap,
-        element: &mut anathema::widgets::Element<'bp>,
-        children: &[anathema::store::tree::Node],
-        values: &mut anathema::store::tree::TreeValues<anathema::widgets::WidgetKind<'bp>>,
-        attribute_storage: &anathema::widgets::AttributeStorage<'bp>,
-        ignore_floats: bool,
+        widgets: anathema::widgets::PaintChildren<'_, 'bp>,
+        attribute_storage: &anathema::resolver::AttributeStorage<'bp>,
     ) {
         anathema::widgets::paint::paint(
             &mut BufferRender(&mut self.buffer),
             glyph_map,
-            element,
-            children,
-            values,
+            widgets,
             attribute_storage,
-            ignore_floats,
-        )
+        );
     }
 
     fn render(&mut self, glyph_map: &mut GlyphMap) {
         let size = self.buffer.size();
-        let mut rendered_buffer = RenderedBuffer::create(size.width, size.height);
+        let mut rendered_buffer = RenderedBuffer::create(size.width as usize, size.height as usize);
 
         for x in 0..size.width {
             for y in 0..size.height {
-                if let Some((&glyph, &style)) = self.buffer.get((x as u16, y as u16).into()) {
+                if let Some((&glyph, &style)) = self.buffer.get((x, y).into()) {
                     match glyph {
-                        Glyph::Single(c, _) => rendered_buffer.set_at(x, y, c, style),
+                        Glyph::Single(c, _) => {
+                            rendered_buffer.set_at(x as usize, y as usize, c, style)
+                        }
                         Glyph::Cluster(idx, _) => {
                             if let Some(value) = glyph_map.get(idx) {
                                 for (offset_x, character) in value.chars().enumerate() {
-                                    rendered_buffer.set_at(x + offset_x, y, character, style);
+                                    rendered_buffer.set_at(
+                                        x as usize + offset_x,
+                                        y as usize,
+                                        character,
+                                        style,
+                                    );
                                 }
                             }
                         }
@@ -132,19 +148,22 @@ impl Backend for ThreadBackend {
             }
         }
 
-        match self.buffer_sender.send(rendered_buffer) {
-            Err(_) => panic!("failed to send updates"),
-            Ok(_) => (),
+        if self.buffer_sender.send(rendered_buffer).is_err() {
+            panic!("failed to send updates")
         }
     }
 
     fn clear(&mut self) {
-        let width = self.size().width as u16;
-        let height = self.size().height as u16;
+        let width = self.size().width;
+        let height = self.size().height;
 
         for x in 0..width {
             for y in 0..height {
-                self.buffer.empty(LocalPos::new(x, y));
+                let Some((glyph, style)) = self.buffer.get_mut(LocalPos::new(x, y)) else {
+                    continue;
+                };
+                *glyph = Glyph::space();
+                *style = Style::reset();
             }
         }
     }
@@ -236,16 +255,15 @@ pub fn launch_threaded_anathema(
             //std::process::abort();
         }));
         let document = Document::new(document);
-        let backend = ThreadBackend {
+        let mut backend = ThreadBackend {
             buffer: Buffer::new(initial_size),
             buffer_sender,
             event_receiver,
         };
 
-        Runtime::builder(document, backend)
-            .finish()
+        Runtime::builder(document, &backend)
+            .finish(|v| v.run(&mut backend))
             .expect("we should never fail to compile the document")
-            .run();
     })?;
 
     Ok(AnathemaThreadHandle {
